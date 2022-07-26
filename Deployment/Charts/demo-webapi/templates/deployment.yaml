@@ -33,9 +33,10 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          envFrom:
-            - configMapRef:
-                name: {{ include "demo-webapi.fullname" . }}
+          volumeMounts:
+            - name: myconfig
+              mountPath: /app/Config
+              readOnly: true
           ports:
             - name: http
               containerPort: 80
@@ -62,3 +63,8 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      volumes:
+        - name: myconfig
+          configMap:
+            name: {{ include "demo-webapi.fullname" . }}
+            

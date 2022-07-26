@@ -80,5 +80,25 @@ affinity: {}
 
 
 configMaps:
-  ConnectionStrings__ConnectStringTest: "Connection string from config map" 
-  AppSettings__SettingKey1: "App settings from config map"
+  appsettings.json: |
+    {
+      "ConnectionStrings": {
+        "ConnectStringTest": "Connection For dev"
+      },
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning"
+        }
+      },
+      "AllowedHosts": "*",
+      "AppSettings": {
+        "SettingKey1": "App value"
+      }
+    }
+
+cachesettings.json: |
+    {
+      "CacheConnectionStrings": {
+        "ConnectStringTest": "Connection For dev"
+    }

@@ -1,5 +1,14 @@
 var builder = WebApplication.CreateBuilder(args);
 
+string path = Path.Combine(Environment.CurrentDirectory, "Config");
+System.IO.DirectoryInfo directory = new DirectoryInfo(path);
+foreach (var item in directory.EnumerateFiles())
+{
+    builder.Configuration.AddJsonFile(item.FullName);
+}
+
+builder.Configuration.AddUserSecrets(typeof(Program).Assembly);
+
 // Add services to the container.
 
 builder.Services.AddControllers();
