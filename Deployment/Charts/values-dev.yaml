@@ -22,7 +22,7 @@ configMaps:
       }
     }
 
-cachesettings.json: |
+  cachesettings.json: |
     {
       "CacheConnectionStrings": {
         "ConnectStringTest": "Connection For Test"
