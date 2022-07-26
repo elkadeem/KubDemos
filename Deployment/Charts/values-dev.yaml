@@ -5,10 +5,10 @@
 replicaCount: 1
 
 image:
-  repository: nginx
+  repository: webapidemo
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart version.
-  tag: ""
+  tag: "v1.1"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -77,8 +77,3 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
-
-
-configMaps:
-  ConnectionStrings__ConnectStringTest: "Connection string from config map" 
-  AppSettings__SettingKey1: "App settings from config map"
