@@ -1,0 +1,116 @@
+# Docker
+# Build and push an image to Azure Container Registry
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+- main
+
+resources:
+- repo: self
+
+variables:
+  # Container registry service connection established during pipeline creation
+  dockerRegistryServiceConnection: 'd21e8592-696d-4b9f-ab40-d03179e3fcef'
+  imageRepository: 'kubdemosgit'
+  containerRegistry: 'kubdemos01.azurecr.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/KubDemos.WebAPI/Dockerfile'
+  tag: '$(Build.BuildId)'
+  environmentName: AKS
+
+  # Agent VM image name
+  vmImageName: 'ubuntu-latest'
+
+stages:
+- stage: Build
+  displayName: Build and push stage
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: Docker@2
+      displayName: Build and push an image to container registry
+      inputs:
+        command: buildAndPush
+        repository: $(imageRepository)
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        buildContext: $(Build.SourcesDirectory)
+        tags: |
+          $(tag)
+
+    - task: HelmInstaller@0
+      displayName: Install Helm
+      inputs:
+        helmVersion: 'latest'
+        installKubectl: true        
+    - task: AzureCLI@2    
+      displayName: Login to Azure Container Registery
+      inputs:
+        azureSubscription: 'Visual Studio Enterprise(bdccbf09-3420-4294-bd61-735b286edbbd)'
+        scriptType: bash
+        scriptLocation: 'inlineScript'
+        inlineScript: 'az acr login --name $(containerRegistry)'
+    
+    - bash: |
+        helm package $(Build.SourcesDirectory)/Deployment/Charts/demo-webapi/ --destination $(Build.ArtifactStagingDirectory)/charts/ --version $(tag)
+        helm push $(Build.ArtifactStagingDirectory)/charts/demo-webapi-$(tag).tgz  oci://$(containerRegistry)/charts
+      displayName: Package chart and push it to Azure Container Registery
+      env:
+        HELM_EXPERIMENTAL_OCI: 1
+
+- stage: Deployment
+  dependsOn: Build
+  displayName: Deploy To Development environment
+  variables:    
+    imageName: $(containerRegistry)/$(imageRepository)
+  jobs:
+  - deployment: Development
+    displayName: Deploy to development enviornment
+    pool: 
+      vmImage: $(vmImageName)
+    environment: $(environmentName).development
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - task: HelmInstaller@0
+              displayName: Install Helm
+              inputs:
+                helmVersion: 'latest'
+                installKubectl: true
+            
+            - task: AzureCLI@2    
+              displayName: Login to Azure Container Registery
+              inputs:
+                azureSubscription: 'Visual Studio Enterprise(bdccbf09-3420-4294-bd61-735b286edbbd)'
+                scriptType: bash
+                scriptLocation: 'inlineScript'
+                inlineScript: 'az acr login --name $(containerRegistry)'
+                
+            - task: DownloadSecureFile@1
+              displayName: Download development values file
+              name: helmValuesYaml
+              inputs:
+                secureFile: 'values-dev-cd.yaml'
+                           
+            
+            - task: HelmDeploy@0
+              displayName: Install heml chart to development namespace
+              inputs:
+                connectionType: 'Azure Resource Manager'
+                azureSubscription: 'Visual Studio Enterprise(bdccbf09-3420-4294-bd61-735b286edbbd)'
+                azureResourceGroup: 'kub-demos'
+                kubernetesCluster: 'kubdemos-aks'
+                namespace: '$(Environment.ResourceName)'
+                command: 'upgrade'
+                releaseName: webapi-demo
+                chartType: 'Name'
+                chartName: 'oci://$(containerRegistry)/charts/demo-webapi'
+                chartVersion: $(tag)
+                overrideValues: |
+                  image.repository=$(imageName)
+                  image.tag=$(tag)
+                valueFile: $(helmValuesYaml.secureFilePath)
+                arguments: --version $(tag)
